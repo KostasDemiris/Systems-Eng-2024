@@ -1,13 +1,10 @@
 # Requires overpy, the library that lets us access the Overpass API through python
+import random
+MAPBOX_API_KEY = "pk.eyJ1Ijoia29uc3RhbnRpbm9zLWRlbWlyaXMiLCJhIjoiY20zdmVuOGtiMDlzdjJsc2dsaHg3d2w3dSJ9.Kc4Z9eZ7_nycHeacJueb0A"
 
 import overpy
 from geopy.geocoders import Nominatim
-from owslib.wms import WebMapService
 import requests
-import json
-import matplotlib.pyplot as plt
-from PIL import Image as plimg
-import numpy as np
 
 
 def get_cross_walk_location(location_geo_code):
@@ -35,28 +32,39 @@ def get_cross_walk_location(location_geo_code):
     # and can use it access the images of those areas for annotation
     return crosswalks
 
-# # Connect to GIBS WMS Service
-# wms = WebMapService('https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?', version='1.1.1')
-#
-# # Configure request for MODIS_Terra_CorrectedReflectance_TrueColor
-# img = wms.getmap(layers=['MODIS_Terra_CorrectedReflectance_TrueColor'],  # Layers
-#                  srs='epsg:4326',  # Map projection
-#                  bbox=(-180,-90,180,90),  # Bounds
-#                  size=(1200, 600),  # Image size
-#                  time='2021-09-21',  # Time of data
-#                  format='image/png',  # Image format
-#                  transparent=True)  # Nodata transparency
-#
-# # Save output PNG to a file
-# out = open('python-examples/MODIS_Terra_CorrectedReflectance_TrueColor.png', 'wb')
-# out.write(img.read())
-# out.close()
-#
-# # View image
-# Image('python-examples/MODIS_Terra_CorrectedReflectance_TrueColor.png')
-#
-#
-# locations = get_cross_walk_location("Bloomsbury, London, UK")
-# for location in locations:
-#     get_open_aerial_map_image(location, 0.01)
-#     break
+
+def get_mapbox_aerial_image(location, output_file_name, zoom=18, size="600x600", style="satellite-v9",
+                            api_key=MAPBOX_API_KEY):
+    longitude, latitude = location  # We split here, so it's easier to map this function onto a set of (lon, lat) coords
+    base_url = f"https://api.mapbox.com/styles/v1/mapbox/{style}/static"
+
+    coords = f"{latitude},{longitude},{zoom}"
+    url = f"{base_url}/{coords}/{size}?access_token={api_key}"
+
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        with open(output_file_name, "wb") as file:
+            file.write(response.content)
+        print(f"Retrieved aerial image and saved it as {output_file_name}")
+
+    else:
+        print("Error, Error, Error!", response.status_code, response.text)
+
+
+def get_crosswalk_images(geo_code):
+    crosswalk_image_files = []
+    crosswalk_set = get_cross_walk_location(geo_code)
+    for crosswalk in crosswalk_set:
+        formatted_crosswalk = list(map(float, crosswalk))
+        stored_file_name = str(formatted_crosswalk)
+        try:
+            get_mapbox_aerial_image(formatted_crosswalk, f"{formatted_crosswalk}.png")
+            crosswalk_image_files.append(stored_file_name)
+        except Exception as e:
+            print(e)
+
+    return crosswalk_image_files
+
+
+print(get_crosswalk_images("Bloomsbury, London, UK"))
